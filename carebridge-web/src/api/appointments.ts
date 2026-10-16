@@ -95,3 +95,42 @@ export async function updateAppointmentStatus(
 
   return handleResponse<Appointment>(response);
 }
+export interface AppointmentPage {
+  appointments: Appointment[];
+  page: number;
+  size: number;
+  totalAppointments: number;
+  totalPages: number;
+}
+
+export async function filterAppointmentsPage(
+  patientName: string,
+  healthcareUnitId: number | null,
+  status: AppointmentStatus | null,
+  page: number = 0,
+  size: number = 10
+): Promise<AppointmentPage> {
+  const params = new URLSearchParams({
+    patientName: patientName.trim(),
+    page: String(page),
+    size: String(size),
+  });
+
+  if (healthcareUnitId !== null) {
+    params.set("healthcareUnitId", String(healthcareUnitId));
+  }
+
+  if (status !== null) {
+    params.set("status", status);
+  }
+
+  const response = await fetch(
+    `${API_URL}/api/appointments/filter/page?${params.toString()}`,
+    {
+      method: "GET",
+      headers: await getAuthHeaders(),
+    }
+  );
+
+  return handleResponse<AppointmentPage>(response);
+}

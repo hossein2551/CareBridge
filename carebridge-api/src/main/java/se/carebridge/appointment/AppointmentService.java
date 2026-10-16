@@ -97,4 +97,69 @@ public class AppointmentService {
     return toResponse(appointment);
   }
 
+  public se.carebridge.appointment.dto.AppointmentPageResponse filterAppointmentsPage(
+      String patientName,
+      Long healthcareUnitId,
+      AppointmentStatus status,
+      int page,
+      int size) {
+    if (page < 0 || size < 1 || size > 100) {
+      throw new jakarta.ws.rs.BadRequestException(
+          "Page must be >= 0 and size must be between 1 and 100");
+    }
+
+    if (healthcareUnitId != null &&
+        HealthcareUnitEntity.findById(healthcareUnitId) == null) {
+      throw new NotFoundException("Healthcare unit not found");
+    }
+
+    StringBuilder queryText = new StringBuilder("1 = 1");
+    java.util.Map<String, Object> parameters = new java.util.HashMap<>();
+
+    if (patientName != null && !patientName.isBlank()) {
+      String search = "%" +
+          patientName.trim().toLowerCase(java.util.Locale.ROOT) +
+          "%";
+
+      queryText.append(
+          " AND (LOWER(patient.firstName) LIKE :patientName " +
+              "OR LOWER(patient.lastName) LIKE :patientName)");
+
+      parameters.put("patientName", search);
+    }
+
+    if (healthcareUnitId != null) {
+      queryText.append(
+          " AND healthcareUnit.id = :healthcareUnitId");
+
+      parameters.put("healthcareUnitId", healthcareUnitId);
+    }
+
+    if (status != null) {
+      queryText.append(" AND status = :status");
+      parameters.put("status", status);
+    }
+
+    var query = AppointmentEntity.<AppointmentEntity>find(
+        queryText.toString(),
+        io.quarkus.panache.common.Sort.by("appointmentTime"),
+        parameters).page(io.quarkus.panache.common.Page.of(page, size));
+
+    long total = query.count();
+
+    List<AppointmentResponse> appointments = query.list()
+        .stream()
+        .map(this::toResponse)
+        .toList();
+
+    int totalPages = (int) ((total + size - 1) / size);
+
+    return new se.carebridge.appointment.dto.AppointmentPageResponse(
+        appointments,
+        page,
+        size,
+        total,
+        totalPages);
+  }
+
 }

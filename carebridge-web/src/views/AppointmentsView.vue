@@ -1,10 +1,9 @@
-
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { keycloak } from "../auth/keycloak";
 import {
   createAppointment,
-  getAppointments,
+  filterAppointmentsPage,
   updateAppointmentStatus,
   type Appointment,
   type AppointmentStatus,
@@ -24,6 +23,17 @@ import {
 const appointments = ref<Appointment[]>([]);
 const patients = ref<Patient[]>([]);
 const healthcareUnits = ref<HealthcareUnit[]>([]);
+
+// Server-side filtering and pagination
+const patientSearch = ref("");
+const selectedUnitId = ref<number | null>(null);
+const selectedStatus = ref<AppointmentStatus | null>(null);
+const currentPage = ref(0);
+const pageSize = 10;
+const totalAppointments = ref(0);
+const totalPages = ref(0);
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let latestRequest = 0;
 
 // Loading and errors
 const loading = ref(false);
@@ -87,31 +97,75 @@ function getStatusLabel(status: AppointmentStatus): string {
   }
 }
 
-// Load appointments, patients and healthcare units
-async function loadAppointments(): Promise<void> {
+// Load only the current page of appointments from the server
+async function loadAppointments(page = currentPage.value): Promise<void> {
+  const request = ++latestRequest;
   loading.value = true;
   error.value = "";
 
   try {
-    const [appointmentsData, patientsData, unitsData] =
-      await Promise.all([
-        getAppointments(),
-        getPatients(),
-        getHealthcareUnits(),
-      ]);
+    const result = await filterAppointmentsPage(
+      patientSearch.value,
+      selectedUnitId.value,
+      selectedStatus.value,
+      page,
+      pageSize
+    );
 
-    appointments.value = appointmentsData;
+    if (request !== latestRequest) return;
+
+    appointments.value = result.appointments;
+    currentPage.value = result.page;
+    totalAppointments.value = result.totalAppointments;
+    totalPages.value = result.totalPages;
+  } catch (err) {
+    if (request !== latestRequest) return;
+    error.value = err instanceof Error ? err.message : "Failed to load appointments.";
+    appointments.value = [];
+  } finally {
+    if (request === latestRequest) loading.value = false;
+  }
+}
+
+async function loadReferenceData(): Promise<void> {
+  try {
+    const [patientsData, unitsData] = await Promise.all([
+      getPatients(),
+      getHealthcareUnits(),
+    ]);
     patients.value = patientsData;
     healthcareUnits.value = unitsData;
   } catch (err) {
-    error.value =
-      err instanceof Error
-        ? err.message
-        : "Failed to load appointments.";
-  } finally {
-    loading.value = false;
+    error.value = err instanceof Error ? err.message : "Failed to load patients or healthcare units.";
   }
 }
+
+function changePage(page: number): void {
+  if (page < 0 || page >= totalPages.value || loading.value) return;
+  void loadAppointments(page);
+}
+
+// Search is debounced; every filter change resets to the first page.
+watch(patientSearch, () => {
+  if (searchTimer !== undefined) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchTimer = undefined;
+    void loadAppointments(0);
+  }, 350);
+});
+
+watch([selectedUnitId, selectedStatus], () => {
+  if (searchTimer !== undefined) {
+    clearTimeout(searchTimer);
+    searchTimer = undefined;
+  }
+  void loadAppointments(0);
+});
+
+onUnmounted(() => {
+  if (searchTimer !== undefined) clearTimeout(searchTimer);
+  latestRequest++;
+});
 
 // Open booking form
 function openBookingForm(): void {
@@ -183,7 +237,7 @@ async function bookAppointment(): Promise<void> {
       appointmentTime: "",
     };
 
-    await loadAppointments();
+    await loadAppointments(0);
   } catch (err) {
     bookingError.value =
       err instanceof Error
@@ -238,7 +292,8 @@ async function changeAppointmentStatus(
 
 // Load data when page opens
 onMounted(() => {
-  void loadAppointments();
+  void loadReferenceData();
+  void loadAppointments(0);
 });
 </script>
 
@@ -263,7 +318,7 @@ onMounted(() => {
         <button
           class="refresh-btn"
           :disabled="loading"
-          @click="loadAppointments"
+          @click="loadAppointments()"
         >
           {{ loading ? "Loading..." : "Refresh" }}
         </button>
@@ -404,6 +459,42 @@ onMounted(() => {
       {{ error }}
     </p>
 
+    <!-- Search and server-side filters -->
+    <div class="filter-card">
+      <div class="filters-grid">
+        <div class="form-field">
+          <label for="appointment-search">Search patient name</label>
+          <input
+            id="appointment-search"
+            v-model="patientSearch"
+            type="search"
+            placeholder="Search by first or last name..."
+          />
+        </div>
+        <div class="form-field">
+          <label for="appointment-unit-filter">Healthcare unit</label>
+          <select id="appointment-unit-filter" v-model="selectedUnitId">
+            <option :value="null">All healthcare units</option>
+            <option v-for="unit in healthcareUnits" :key="unit.id" :value="unit.id">
+              {{ unit.name }} - {{ unit.city }}
+            </option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="appointment-status-filter">Status</label>
+          <select id="appointment-status-filter" v-model="selectedStatus">
+            <option :value="null">All statuses</option>
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <p class="results-count" aria-live="polite">
+        {{ totalAppointments }} matching appointments
+      </p>
+    </div>
+
     <!-- Appointment table -->
     <div class="table-card">
       <p v-if="loading">
@@ -488,6 +579,21 @@ onMounted(() => {
         </tbody>
       </table>
 
+      <div v-if="!error && !loading" class="pagination">
+        <span>
+          Page {{ currentPage + 1 }} of {{ Math.max(totalPages, 1) }}
+          ({{ totalAppointments }} total)
+        </span>
+        <div class="pagination-buttons">
+          <button type="button" :disabled="currentPage === 0" @click="changePage(currentPage - 1)">
+            Previous
+          </button>
+          <button type="button" :disabled="currentPage + 1 >= totalPages" @click="changePage(currentPage + 1)">
+            Next
+          </button>
+        </div>
+      </div>
+
       <p
         v-if="
           !loading &&
@@ -563,7 +669,8 @@ button:disabled {
 }
 
 .table-card,
-.booking-card {
+.booking-card,
+.filter-card {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -718,5 +825,40 @@ th {
   .booking-header {
     align-items: flex-start;
   }
+}
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.results-count {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pagination,
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination {
+  margin-top: 18px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.pagination-buttons button {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+@media (max-width: 800px) {
+  .filters-grid { grid-template-columns: 1fr; }
 }
 </style>

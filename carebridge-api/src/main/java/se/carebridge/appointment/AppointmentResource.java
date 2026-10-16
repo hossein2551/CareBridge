@@ -10,6 +10,7 @@ import jakarta.ws.rs.core.Response;
 
 import se.carebridge.appointment.dto.AppointmentRequest;
 import se.carebridge.appointment.dto.AppointmentResponse;
+import se.carebridge.appointment.dto.AppointmentPageResponse;
 
 import java.util.List;
 
@@ -22,11 +23,31 @@ public class AppointmentResource {
   @Inject
   AppointmentService appointmentService;
 
+  // Get all appointments
   @GET
   public List<AppointmentResponse> getAllAppointments() {
     return appointmentService.getAllAppointments();
   }
 
+  // Search, filter and paginate appointments
+  @GET
+  @Path("/filter/page")
+  public AppointmentPageResponse filterAppointmentsPage(
+      @QueryParam("patientName") @DefaultValue("") String patientName,
+      @QueryParam("healthcareUnitId") Long healthcareUnitId,
+      @QueryParam("status") AppointmentStatus status,
+      @QueryParam("page") @DefaultValue("0") int page,
+      @QueryParam("size") @DefaultValue("10") int size) {
+
+    return appointmentService.filterAppointmentsPage(
+        patientName,
+        healthcareUnitId,
+        status,
+        page,
+        size);
+  }
+
+  // Get appointment by ID
   @GET
   @Path("/{id}")
   public AppointmentResponse getAppointmentById(
@@ -35,6 +56,7 @@ public class AppointmentResource {
     return appointmentService.getAppointmentById(id);
   }
 
+  // Create new appointment
   @POST
   @RolesAllowed({ "ADMIN", "DOCTOR" })
   public Response createAppointment(
@@ -47,6 +69,7 @@ public class AppointmentResource {
         .build();
   }
 
+  // Update appointment status
   @PATCH
   @Path("/{id}/status")
   @RolesAllowed({ "ADMIN", "DOCTOR" })
@@ -55,7 +78,7 @@ public class AppointmentResource {
       AppointmentStatus newStatus) {
 
     return appointmentService.updateAppointmentStatus(
-        id, newStatus);
+        id,
+        newStatus);
   }
-
 }
