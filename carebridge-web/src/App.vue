@@ -36,12 +36,13 @@ async function logout() {
       </div>
 
       <nav>
-        <RouterLink to="/">Dashboard</RouterLink>
-        <RouterLink to="/patients">Patients</RouterLink>
-        <RouterLink to="/healthcare-units">
-          Healthcare Units
-        </RouterLink>
-      </nav>
+  <RouterLink to="/">Dashboard</RouterLink>
+  <RouterLink to="/patients">Patients</RouterLink>
+  <RouterLink to="/appointments">Appointments</RouterLink>
+  <RouterLink to="/healthcare-units">
+    Healthcare Units
+  </RouterLink>
+</nav>
 
       <div class="sidebar-footer">
   <p>Signed in as</p>

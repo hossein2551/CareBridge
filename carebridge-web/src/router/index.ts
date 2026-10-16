@@ -1,4 +1,5 @@
-﻿import { createRouter, createWebHistory } from "vue-router";
+﻿
+import { createRouter, createWebHistory } from "vue-router";
 
 import DashboardView from "../views/DashboardView.vue";
 
@@ -14,6 +15,11 @@ const router = createRouter({
       path: "/patients",
       name: "patients",
       component: () => import("../views/PatientsView.vue"),
+    },
+    {
+      path: "/appointments",
+      name: "appointments",
+      component: () => import("../views/AppointmentsView.vue"),
     },
     {
       path: "/healthcare-units",
