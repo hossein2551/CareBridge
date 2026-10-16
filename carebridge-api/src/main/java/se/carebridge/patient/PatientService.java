@@ -190,6 +190,57 @@ searchPatientsPage(String name, int page, int size) {
         total,
         totalPages
     );
-}
 
+}
+public se.carebridge.patient.dto.PatientPageResponse filterPatientsPage(
+        String name, Long healthcareUnitId, int page, int size) {
+
+    if (page < 0 || size < 1 || size > 100) {
+        throw new jakarta.ws.rs.BadRequestException(
+            "Page must be >= 0 and size must be between 1 and 100"
+        );
+    }
+
+    if (healthcareUnitId != null) {
+        findHealthcareUnit(healthcareUnitId);
+    }
+
+    String search = name == null
+        ? ""
+        : name.trim().toLowerCase(Locale.ROOT);
+
+    StringBuilder queryText = new StringBuilder("1 = 1");
+    java.util.Map<String, Object> parameters = new java.util.HashMap<>();
+
+    if (!search.isEmpty()) {
+        queryText.append(
+            " AND (LOWER(firstName) LIKE :name OR LOWER(lastName) LIKE :name)"
+        );
+        parameters.put("name", "%" + search + "%");
+    }
+
+    if (healthcareUnitId != null) {
+        queryText.append(" AND healthcareUnit.id = :unitId");
+        parameters.put("unitId", healthcareUnitId);
+    }
+
+    var query = PatientEntity.<PatientEntity>find(
+        queryText.toString(),
+        io.quarkus.panache.common.Sort.by("id"),
+        parameters
+    ).page(io.quarkus.panache.common.Page.of(page, size));
+
+    long total = query.count();
+
+    var patients = query.list()
+        .stream()
+        .map(this::toResponse)
+        .toList();
+
+    int totalPages = (int) ((total + size - 1) / size);
+
+    return new se.carebridge.patient.dto.PatientPageResponse(
+        patients, page, size, total, totalPages
+    );
+}
 }

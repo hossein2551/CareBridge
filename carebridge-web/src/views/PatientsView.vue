@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import {
-  searchPatientsPage,
+filterPatientsPage,
   createPatient,
   updatePatient,
   deletePatient,
@@ -22,6 +22,7 @@ const healthcareUnits = ref<HealthcareUnit[]>([]);
 const unitsLoading = ref(false);
 const unitsError = ref("");
 const search = ref("");
+const selectedHealthcareUnitId = ref<number | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const error = ref("");
@@ -56,11 +57,12 @@ async function loadPatients(page = currentPage.value) {
   error.value = "";
 
   try {
-    const result = await searchPatientsPage(
-      search.value.trim(),
-      page,
-      pageSize
-    );
+    const result = await filterPatientsPage(
+  search.value.trim(),
+  selectedHealthcareUnitId.value,
+  page,
+  pageSize
+);
 
     if (id !== requestId) return;
 
@@ -305,6 +307,16 @@ onMounted(() => {
   void loadHealthcareUnits();
 });
 
+watch(selectedHealthcareUnitId, () => {
+  if (searchTimeout !== undefined) {
+    clearTimeout(searchTimeout);
+    searchTimeout = undefined;
+  }
+
+  requestId++;
+  void loadPatients(0);
+});
+
 
 </script>
 
@@ -337,22 +349,47 @@ onMounted(() => {
 
     <div class="table-card">
       <div class="toolbar">
-        <div class="search-area">
-          <input
-            v-model="search"
-            type="search"
-            placeholder="Search patients by name..."
-            aria-label="Search all registered patients"
-          />
+  <div class="search-area">
+    <input
+      v-model="search"
+      type="search"
+      placeholder="Search patients by name..."
+      aria-label="Search all registered patients"
+    />
 
-          <small>Search across all registered patients.</small>
-        </div>
+    <small>Search across all registered patients.</small>
+  </div>
 
-        <span>
-          {{ totalPatients }}
-          {{ search.trim() ? "matching patients" : "registered patients" }}
-        </span>
-      </div>
+  <div class="filter-area">
+    <label for="unit-filter">Filter by healthcare unit</label>
+
+    <select
+      id="unit-filter"
+      v-model="selectedHealthcareUnitId"
+      :disabled="unitsLoading || !!unitsError"
+    >
+      <option :value="null">All healthcare units</option>
+
+      <option
+        v-for="unit in healthcareUnits"
+        :key="unit.id"
+        :value="unit.id"
+      >
+        {{ unit.name }} – {{ unit.city }}
+      </option>
+    </select>
+
+    <small v-if="unitsError" class="error">
+      {{ unitsError }}
+    </small>
+  </div>
+
+  <span>
+    {{ totalPatients }}
+    {{ search.trim() ? "matching patients" : "registered patients" }}
+  </span>
+</div>
+    
 
       <p v-if="error" class="error" role="alert">
         {{ error }}

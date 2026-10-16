@@ -12,86 +12,96 @@ import se.carebridge.patient.dto.PatientRequest;
 import se.carebridge.patient.dto.PatientResponse;
 
 @Path("/api/patients")
-@RolesAllowed({"ADMIN", "DOCTOR", "NURSE"})
+@RolesAllowed({ "ADMIN", "DOCTOR", "NURSE" })
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class PatientResource {
 
-    @Inject
-    PatientService patientService;
+  @Inject
+  PatientService patientService;
 
-    @GET
-    public List<PatientResponse> getAllPatients() {
-        return patientService.getAllPatients();
+  @GET
+  public List<PatientResponse> getAllPatients() {
+    return patientService.getAllPatients();
+  }
+
+  @GET
+  @Path("/{id}")
+  public PatientResponse getPatientById(@PathParam("id") Long id) {
+    return patientService.getPatientById(id);
+  }
+
+  @POST
+  @RolesAllowed({ "ADMIN", "DOCTOR" })
+  public Response createPatient(@Valid PatientRequest request) {
+    PatientResponse saved = patientService.createPatient(request);
+
+    return Response.created(
+        URI.create("/api/patients/" + saved.id())).entity(saved).build();
+  }
+
+  @PUT
+  @Path("/{id}")
+  @RolesAllowed({ "ADMIN", "DOCTOR" })
+  public PatientResponse updatePatient(
+      @PathParam("id") Long id,
+      @Valid PatientRequest request) {
+    return patientService.updatePatient(id, request);
+  }
+
+  @DELETE
+  @Path("/{id}")
+  @RolesAllowed("ADMIN")
+  public Response deletePatient(@PathParam("id") Long id) {
+    boolean deleted = patientService.deletePatient(id);
+
+    if (!deleted) {
+      throw new NotFoundException("Patient not found");
     }
 
-    @GET
-    @Path("/{id}")
-    public PatientResponse getPatientById(@PathParam("id") Long id) {
-        return patientService.getPatientById(id);
+    return Response.noContent().build();
+  }
+
+  @GET
+  @Path("/search")
+  public List<PatientResponse> searchPatients(
+      @QueryParam("name") String name) {
+
+    if (name == null || name.isBlank()) {
+      throw new BadRequestException("Search name is required");
     }
 
-    @POST
-    @RolesAllowed({"ADMIN", "DOCTOR"})
-    public Response createPatient(@Valid PatientRequest request) {
-        PatientResponse saved = patientService.createPatient(request);
+    return patientService.searchPatients(name);
+  }
 
-        return Response.created(
-            URI.create("/api/patients/" + saved.id())
-        ).entity(saved).build();
-    }
+  @GET
+  @Path("/page")
+  public se.carebridge.patient.dto.PatientPageResponse getPatientsPage(
+      @QueryParam("page") @DefaultValue("0") int page,
+      @QueryParam("size") @DefaultValue("10") int size) {
 
-    @PUT
-    @Path("/{id}")
-    @RolesAllowed({"ADMIN", "DOCTOR"})
-    public PatientResponse updatePatient(
-            @PathParam("id") Long id,
-            @Valid PatientRequest request) {
-        return patientService.updatePatient(id, request);
-    }
+    return patientService.getPatientsPage(page, size);
+  }
 
-    @DELETE
-    @Path("/{id}")
-    @RolesAllowed("ADMIN")
-    public Response deletePatient(@PathParam("id") Long id) {
-        boolean deleted = patientService.deletePatient(id);
+  @GET
+  @Path("/search/page")
+  public se.carebridge.patient.dto.PatientPageResponse searchPatientsPage(
+      @QueryParam("name") @DefaultValue("") String name,
+      @QueryParam("page") @DefaultValue("0") int page,
+      @QueryParam("size") @DefaultValue("10") int size) {
 
-        if (!deleted) {
-            throw new NotFoundException("Patient not found");
-        }
+    return patientService.searchPatientsPage(name, page, size);
+  }
 
-        return Response.noContent().build();
-    }
+  @GET
+  @Path("/filter/page")
+  public se.carebridge.patient.dto.PatientPageResponse filterPatientsPage(
+      @QueryParam("name") @DefaultValue("") String name,
+      @QueryParam("healthcareUnitId") Long healthcareUnitId,
+      @QueryParam("page") @DefaultValue("0") int page,
+      @QueryParam("size") @DefaultValue("10") int size) {
 
-    @GET
-    @Path("/search")
-    public List<PatientResponse> searchPatients(
-            @QueryParam("name") String name) {
-
-        if (name == null || name.isBlank()) {
-            throw new BadRequestException("Search name is required");
-        }
-
-        return patientService.searchPatients(name);
-    }
-
-    @GET
-    @Path("/page")
-    public se.carebridge.patient.dto.PatientPageResponse getPatientsPage(
-            @QueryParam("page") @DefaultValue("0") int page,
-            @QueryParam("size") @DefaultValue("10") int size) {
-
-        return patientService.getPatientsPage(page, size);
-    }
-
-    @GET
-    @Path("/search/page")
-    public se.carebridge.patient.dto.PatientPageResponse searchPatientsPage(
-            @QueryParam("name") @DefaultValue("") String name,
-            @QueryParam("page") @DefaultValue("0") int page,
-            @QueryParam("size") @DefaultValue("10") int size) {
-
-        return patientService.searchPatientsPage(name, page, size);
-    }
-
+    return patientService.filterPatientsPage(
+        name, healthcareUnitId, page, size);
+  }
 }

@@ -221,4 +221,34 @@ export async function deletePatient(
       `Failed to delete patient: ${response.status}`
     );
   }
+  
+}
+
+export async function filterPatientsPage(
+  name: string,
+  healthcareUnitId: number | null,
+  page: number = 0,
+  size: number = 10
+): Promise<PatientPage> {
+  const params = new URLSearchParams({
+    name,
+    page: String(page),
+    size: String(size),
+  });
+
+  if (healthcareUnitId !== null) {
+    params.set("healthcareUnitId", String(healthcareUnitId));
+  }
+
+  const response = await fetch(
+    `${API_URL}/api/patients/filter/page?${params.toString()}`,
+    {
+      method: "GET",
+      headers: await getPatientAuthHeaders(),
+    }
+  );
+
+  checkResponse(response);
+
+  return (await response.json()) as PatientPage;
 }
