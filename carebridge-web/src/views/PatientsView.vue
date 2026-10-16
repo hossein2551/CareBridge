@@ -13,8 +13,14 @@ import {
   canManagePatients,
   canDeletePatients,
 } from "../auth/permissions";
-
+import {
+  getHealthcareUnits,
+  type HealthcareUnit,
+} from "../api/healthcareUnits";
 const patients = ref<Patient[]>([]);
+const healthcareUnits = ref<HealthcareUnit[]>([]);
+const unitsLoading = ref(false);
+const unitsError = ref("");
 const search = ref("");
 const loading = ref(false);
 const saving = ref(false);
@@ -118,6 +124,22 @@ function refreshPatients() {
   }
 
   void loadPatients(search.value.trim() ? 0 : currentPage.value);
+}
+async function loadHealthcareUnits() {
+  unitsLoading.value = true;
+  unitsError.value = "";
+
+  try {
+    healthcareUnits.value = await getHealthcareUnits();
+  } catch (err) {
+    healthcareUnits.value = [];
+    unitsError.value =
+      err instanceof Error
+        ? err.message
+        : "Failed to load healthcare units.";
+  } finally {
+    unitsLoading.value = false;
+  }
 }
 
 function openCreateForm() {
@@ -259,9 +281,17 @@ async function removePatient(patient: Patient) {
   }
 }
 
-onMounted(() => {
-  void loadPatients(0);
-});
+function getHealthcareUnitName(unitId: number | null): string {
+  if (unitId === null) {
+    return "Not assigned";
+  }
+
+  const unit = healthcareUnits.value.find(
+    (item) => item.id === unitId
+  );
+
+  return unit ? unit.name : `Unit ${unitId}`;
+}
 
 onUnmounted(() => {
   if (searchTimeout !== undefined) {
@@ -270,6 +300,12 @@ onUnmounted(() => {
 
   requestId++;
 });
+onMounted(() => {
+  void loadPatients(0);
+  void loadHealthcareUnits();
+});
+
+
 </script>
 
 <template>
@@ -344,8 +380,7 @@ onUnmounted(() => {
             <td>{{ patient.firstName }}</td>
             <td>{{ patient.lastName }}</td>
             <td>{{ patient.birthYear }}</td>
-            <td>{{ patient.healthcareUnitId ?? "Not assigned" }}</td>
-
+<td>{{ getHealthcareUnitName(patient.healthcareUnitId) }}</td>
             <td>
               <div class="table-actions">
                 <button
@@ -457,14 +492,30 @@ onUnmounted(() => {
         </label>
 
         <label>
-          Healthcare unit ID (optional)
-          <input
-            v-model.number="form.healthcareUnitId"
-            type="number"
-            min="1"
-            placeholder="Leave empty if not assigned"
-          />
-        </label>
+  Healthcare unit
+  <select
+    v-model="form.healthcareUnitId"
+    :disabled="unitsLoading || !!unitsError"
+  >
+    <option :value="null">Not assigned</option>
+
+    <option
+      v-for="unit in healthcareUnits"
+      :key="unit.id"
+      :value="unit.id"
+    >
+      {{ unit.name }} – {{ unit.city }}
+    </option>
+  </select>
+
+  <small v-if="unitsLoading">
+    Loading healthcare units...
+  </small>
+
+  <small v-if="unitsError" class="error">
+    {{ unitsError }}
+  </small>
+</label>
 
         <p v-if="formError" class="error" role="alert">
           {{ formError }}
@@ -497,12 +548,30 @@ onUnmounted(() => {
       <p><strong>Birth year:</strong> {{ selectedPatient.birthYear }}</p>
       <p>
         <strong>Healthcare unit:</strong>
-        {{ selectedPatient.healthcareUnitId ?? "Not assigned" }}
-      </p>
+{{ getHealthcareUnitName(selectedPatient.healthcareUnitId) }}      </p>
     </section>
   </div>
 </template>
+select {
+  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  color: #172033;
+}
 
+.patient-form small {
+  font-size: 12px;
+  font-weight: normal;
+  color: #64748b;
+}
+
+.patient-form small.error {
+  color: #dc2626;
+}
 <style scoped>
 .patients-page {
   padding: 32px;
