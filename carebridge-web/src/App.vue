@@ -1,10 +1,18 @@
 
+
 <script setup lang="ts">
 import { keycloak } from "./auth/keycloak";
 
 const authenticated = keycloak.authenticated === true;
+
 const username =
   keycloak.tokenParsed?.preferred_username ?? "User";
+
+const roles = keycloak.realmAccess?.roles ?? [];
+
+const userRole = ["ADMIN", "DOCTOR", "NURSE"].find(
+  (role) => roles.includes(role)
+) ?? "No healthcare role";
 
 async function login() {
   await keycloak.login({
@@ -36,10 +44,11 @@ async function logout() {
       </nav>
 
       <div class="sidebar-footer">
-        <p>Signed in as</p>
-        <strong>{{ username }}</strong>
-        <button @click="logout">Log out</button>
-      </div>
+  <p>Signed in as</p>
+  <strong>{{ username }}</strong>
+  <p class="user-role">{{ userRole }}</p>
+  <button @click="logout">Log out</button>
+</div>
     </aside>
 
     <main class="main-content">
@@ -147,5 +156,11 @@ button {
   .sidebar {
     width: 100%;
   }
+}
+.user-role {
+  color: #93c5fd !important;
+  font-size: 12px;
+  font-weight: bold;
+  margin-top: 8px;
 }
 </style>

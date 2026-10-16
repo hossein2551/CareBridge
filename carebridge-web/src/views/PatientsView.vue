@@ -1,21 +1,44 @@
 ﻿
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import {
   searchPatientsPage,
-  type Patient
+  createPatient,
+  updatePatient,
+  deletePatient,
+  type Patient,
+  type PatientRequest,
 } from "../api/patients";
+import {
+  canManagePatients,
+  canDeletePatients,
+} from "../auth/permissions";
 
 const patients = ref<Patient[]>([]);
 const search = ref("");
 const loading = ref(false);
+const saving = ref(false);
 const error = ref("");
+const formError = ref("");
 const selectedPatient = ref<Patient | null>(null);
 
 const currentPage = ref(0);
 const pageSize = 10;
 const totalPages = ref(0);
 const totalPatients = ref(0);
+
+const canManage = canManagePatients();
+const canDelete = canDeletePatients();
+
+const showForm = ref(false);
+const editingId = ref<number | null>(null);
+
+const form = ref<PatientRequest>({
+  firstName: "",
+  lastName: "",
+  birthYear: new Date().getFullYear(),
+  healthcareUnitId: null,
+});
 
 let requestId = 0;
 let searchTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -25,7 +48,6 @@ async function loadPatients(page = currentPage.value) {
 
   loading.value = true;
   error.value = "";
-  selectedPatient.value = null;
 
   try {
     const result = await searchPatientsPage(
@@ -34,7 +56,6 @@ async function loadPatients(page = currentPage.value) {
       pageSize
     );
 
-    // Ignore responses from outdated requests
     if (id !== requestId) return;
 
     patients.value = result.patients;
@@ -42,18 +63,19 @@ async function loadPatients(page = currentPage.value) {
     totalPages.value = result.totalPages;
     totalPatients.value = result.totalPatients;
 
+    selectedPatient.value = null;
   } catch (err) {
     if (id !== requestId) return;
 
     patients.value = [];
     totalPages.value = 0;
     totalPatients.value = 0;
+    selectedPatient.value = null;
 
     error.value =
       err instanceof Error
         ? err.message
         : "Failed to load patients";
-
   } finally {
     if (id === requestId) {
       loading.value = false;
@@ -73,13 +95,11 @@ async function changePage(newPage: number) {
   await loadPatients(newPage);
 }
 
-// Search the entire database with a short delay
 watch(search, () => {
   if (searchTimeout !== undefined) {
     clearTimeout(searchTimeout);
   }
 
-  // Invalidate older requests immediately
   requestId++;
   loading.value = true;
   error.value = "";
@@ -97,7 +117,146 @@ function refreshPatients() {
     searchTimeout = undefined;
   }
 
-  void loadPatients(currentPage.value);
+  void loadPatients(search.value.trim() ? 0 : currentPage.value);
+}
+
+function openCreateForm() {
+  if (!canManage) return;
+
+  editingId.value = null;
+  formError.value = "";
+
+  form.value = {
+    firstName: "",
+    lastName: "",
+    birthYear: new Date().getFullYear(),
+    healthcareUnitId: null,
+  };
+
+  showForm.value = true;
+}
+
+function openEditForm(patient: Patient) {
+  if (!canManage) return;
+
+  editingId.value = patient.id;
+  formError.value = "";
+
+  form.value = {
+    firstName: patient.firstName,
+    lastName: patient.lastName,
+    birthYear: patient.birthYear,
+    healthcareUnitId: patient.healthcareUnitId,
+  };
+
+  selectedPatient.value = null;
+  showForm.value = true;
+}
+
+function closeForm() {
+  if (saving.value) return;
+
+  showForm.value = false;
+  editingId.value = null;
+  formError.value = "";
+}
+
+async function savePatient() {
+  if (!canManage || saving.value) return;
+
+  formError.value = "";
+
+  const request: PatientRequest = {
+    firstName: form.value.firstName.trim(),
+    lastName: form.value.lastName.trim(),
+    birthYear: Number(form.value.birthYear),
+    healthcareUnitId:
+      form.value.healthcareUnitId === null ||
+      form.value.healthcareUnitId === undefined ||
+      String(form.value.healthcareUnitId).trim() === ""
+        ? null
+        : Number(form.value.healthcareUnitId),
+  };
+
+  if (!request.firstName || !request.lastName) {
+    formError.value = "First name and last name are required.";
+    return;
+  }
+
+  const year = new Date().getFullYear();
+
+  if (
+    !Number.isInteger(request.birthYear) ||
+    request.birthYear < 1900 ||
+    request.birthYear > year
+  ) {
+    formError.value = "Enter a valid birth year.";
+    return;
+  }
+
+  if (
+    request.healthcareUnitId !== null &&
+    (!Number.isInteger(request.healthcareUnitId) ||
+      request.healthcareUnitId < 1)
+  ) {
+    formError.value = "Healthcare unit ID must be a positive number.";
+    return;
+  }
+
+  saving.value = true;
+
+  try {
+    if (editingId.value === null) {
+      await createPatient(request);
+    } else {
+      await updatePatient(editingId.value, request);
+    }
+
+    showForm.value = false;
+    editingId.value = null;
+    await loadPatients(currentPage.value);
+  } catch (err) {
+    formError.value =
+      err instanceof Error
+        ? err.message
+        : "Failed to save patient.";
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function removePatient(patient: Patient) {
+  if (!canDelete || saving.value) return;
+
+  const confirmed = window.confirm(
+    `Delete ${patient.firstName} ${patient.lastName}? This cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  saving.value = true;
+  error.value = "";
+
+  try {
+    await deletePatient(patient.id);
+    selectedPatient.value = null;
+
+    // Reload the same page, or return to the previous page
+    // if the current page becomes empty.
+    const nextPage =
+      patients.value.length === 1 && currentPage.value > 0
+        ? currentPage.value - 1
+        : currentPage.value;
+
+    await loadPatients(nextPage);
+  } catch (err) {
+    error.value =
+      err instanceof Error
+        ? err.message
+        : "Failed to delete patient.";
+  } finally {
+    saving.value = false;
+  }
 }
 
 onMounted(() => {
@@ -118,15 +277,26 @@ onUnmounted(() => {
     <header class="page-header">
       <div>
         <h1>Patients</h1>
-        <p>View and search registered patients.</p>
+        <p>View and manage registered patients.</p>
       </div>
 
-      <button
-        @click="refreshPatients"
-        :disabled="loading"
-      >
-        {{ loading ? "Loading..." : "Refresh" }}
-      </button>
+      <div class="header-actions">
+        <button
+          v-if="canManage"
+          @click="openCreateForm"
+          :disabled="saving"
+        >
+          + Add Patient
+        </button>
+
+        <button
+          class="secondary-btn"
+          @click="refreshPatients"
+          :disabled="loading || saving"
+        >
+          {{ loading ? "Loading..." : "Refresh" }}
+        </button>
+      </div>
     </header>
 
     <div class="table-card">
@@ -139,9 +309,7 @@ onUnmounted(() => {
             aria-label="Search all registered patients"
           />
 
-          <small>
-            Search across all registered patients.
-          </small>
+          <small>Search across all registered patients.</small>
         </div>
 
         <span>
@@ -150,18 +318,11 @@ onUnmounted(() => {
         </span>
       </div>
 
-      <p
-        v-if="error"
-        class="error"
-        role="alert"
-      >
+      <p v-if="error" class="error" role="alert">
         {{ error }}
       </p>
 
-      <p
-        v-if="loading"
-        class="loading-message"
-      >
+      <p v-if="loading" class="loading-message">
         Loading patients...
       </p>
 
@@ -173,31 +334,45 @@ onUnmounted(() => {
             <th>Last name</th>
             <th>Birth year</th>
             <th>Healthcare unit</th>
-            <th>Details</th>
+            <th>Actions</th>
           </tr>
         </thead>
 
         <tbody>
-          <tr
-            v-for="patient in patients"
-            :key="patient.id"
-          >
+          <tr v-for="patient in patients" :key="patient.id">
             <td>{{ patient.id }}</td>
             <td>{{ patient.firstName }}</td>
             <td>{{ patient.lastName }}</td>
             <td>{{ patient.birthYear }}</td>
+            <td>{{ patient.healthcareUnitId ?? "Not assigned" }}</td>
 
             <td>
-              {{ patient.healthcareUnitId ?? "Not assigned" }}
-            </td>
+              <div class="table-actions">
+                <button
+                  class="view-btn"
+                  @click="selectedPatient = patient"
+                >
+                  View
+                </button>
 
-            <td>
-              <button
-                class="view-btn"
-                @click="selectedPatient = patient"
-              >
-                View
-              </button>
+                <button
+                  v-if="canManage"
+                  class="edit-btn"
+                  @click="openEditForm(patient)"
+                  :disabled="saving"
+                >
+                  Edit
+                </button>
+
+                <button
+                  v-if="canDelete"
+                  class="delete-btn"
+                  @click="removePatient(patient)"
+                  :disabled="saving"
+                >
+                  Delete
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -226,10 +401,7 @@ onUnmounted(() => {
           </button>
 
           <button
-            :disabled="
-              loading ||
-              currentPage + 1 >= totalPages
-            "
+            :disabled="loading || currentPage + 1 >= totalPages"
             @click="changePage(currentPage + 1)"
           >
             Next
@@ -238,38 +410,91 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <section
-      v-if="selectedPatient"
-      class="detail-card"
-    >
+    <!-- Create / edit form -->
+    <section v-if="showForm" class="detail-card">
+      <div class="detail-header">
+        <h2>
+          {{ editingId === null ? "Add Patient" : "Edit Patient" }}
+        </h2>
+
+        <button
+          class="secondary-btn"
+          @click="closeForm"
+          :disabled="saving"
+        >
+          Cancel
+        </button>
+      </div>
+
+      <form class="patient-form" @submit.prevent="savePatient">
+        <label>
+          First name
+          <input
+            v-model="form.firstName"
+            required
+            maxlength="100"
+          />
+        </label>
+
+        <label>
+          Last name
+          <input
+            v-model="form.lastName"
+            required
+            maxlength="100"
+          />
+        </label>
+
+        <label>
+          Birth year
+          <input
+            v-model.number="form.birthYear"
+            type="number"
+            min="1900"
+            :max="new Date().getFullYear()"
+            required
+          />
+        </label>
+
+        <label>
+          Healthcare unit ID (optional)
+          <input
+            v-model.number="form.healthcareUnitId"
+            type="number"
+            min="1"
+            placeholder="Leave empty if not assigned"
+          />
+        </label>
+
+        <p v-if="formError" class="error" role="alert">
+          {{ formError }}
+        </p>
+
+        <div class="form-actions">
+          <button type="submit" :disabled="saving">
+            {{ saving ? "Saving..." : "Save Patient" }}
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Patient details -->
+    <section v-if="selectedPatient" class="detail-card">
       <div class="detail-header">
         <h2>Patient details</h2>
 
-        <button @click="selectedPatient = null">
+        <button
+          class="secondary-btn"
+          @click="selectedPatient = null"
+        >
           Close
         </button>
       </div>
 
-      <p>
-        <strong>ID:</strong>
-        {{ selectedPatient.id }}
-      </p>
-
-      <p>
-        <strong>First name:</strong>
-        {{ selectedPatient.firstName }}
-      </p>
-
-      <p>
-        <strong>Last name:</strong>
-        {{ selectedPatient.lastName }}
-      </p>
-
-      <p>
-        <strong>Birth year:</strong>
-        {{ selectedPatient.birthYear }}
-      </p>
-
+      <p><strong>ID:</strong> {{ selectedPatient.id }}</p>
+      <p><strong>First name:</strong> {{ selectedPatient.firstName }}</p>
+      <p><strong>Last name:</strong> {{ selectedPatient.lastName }}</p>
+      <p><strong>Birth year:</strong> {{ selectedPatient.birthYear }}</p>
       <p>
         <strong>Healthcare unit:</strong>
         {{ selectedPatient.healthcareUnitId ?? "Not assigned" }}
@@ -285,12 +510,29 @@ onUnmounted(() => {
   font-family: Arial, sans-serif;
 }
 
-.page-header {
+.page-header,
+.header-actions,
+.toolbar,
+.detail-header,
+.pagination,
+.pagination-buttons,
+.table-actions,
+.form-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
+}
+
+.page-header,
+.toolbar,
+.detail-header,
+.pagination {
+  justify-content: space-between;
+}
+
+.page-header {
   margin-bottom: 28px;
+  flex-wrap: wrap;
 }
 
 .page-header h1 {
@@ -320,6 +562,33 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.secondary-btn,
+.view-btn {
+  background: #e8efff;
+  color: #1d4ed8;
+}
+
+.secondary-btn:hover:not(:disabled),
+.view-btn:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.edit-btn {
+  background: #0f766e;
+}
+
+.edit-btn:hover:not(:disabled) {
+  background: #115e59;
+}
+
+.delete-btn {
+  background: #dc2626;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
 .table-card,
 .detail-card {
   background: white;
@@ -334,9 +603,6 @@ button:disabled {
 }
 
 .toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -355,6 +621,7 @@ input {
   padding: 12px;
   width: 320px;
   max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 14px;
@@ -377,34 +644,36 @@ th {
   background: #f8fafc;
 }
 
-.view-btn {
-  background: #e8efff;
-  color: #1d4ed8;
-}
-
-.view-btn:hover:not(:disabled) {
-  background: #dbeafe;
-}
-
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-top: 24px;
+.table-actions {
   flex-wrap: wrap;
 }
 
-.pagination-buttons {
+.patient-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.patient-form label {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.patient-form input {
+  width: 100%;
+}
+
+.patient-form .error,
+.form-actions {
+  grid-column: 1 / -1;
+}
+
+.pagination {
+  margin-top: 24px;
+  flex-wrap: wrap;
 }
 
 .error {
@@ -425,6 +694,10 @@ th {
   .page-header,
   .toolbar {
     flex-wrap: wrap;
+  }
+
+  .patient-form {
+    grid-template-columns: 1fr;
   }
 
   .pagination {
