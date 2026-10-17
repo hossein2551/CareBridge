@@ -22,6 +22,24 @@ export interface AppointmentRequest {
   appointmentTime: string;
 }
 
+export interface AppointmentPage {
+  appointments: Appointment[];
+  page: number;
+  size: number;
+  totalAppointments: number;
+  totalPages: number;
+}
+
+export class AppointmentApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AppointmentApiError";
+    this.status = status;
+  }
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   if (!keycloak.authenticated) {
     throw new Error("You must be logged in.");
@@ -39,11 +57,18 @@ async function handleResponse<T>(
   response: Response
 ): Promise<T> {
   if (!response.ok) {
+    if (response.status === 409) {
+      throw new AppointmentApiError(
+        "Den här tiden är redan bokad på den valda vårdenheten. Välj en annan tid.",
+        409
+      );
+    }
+
     const message = await response.text();
 
-    throw new Error(
-      message ||
-      `Request failed with status ${response.status}`
+    throw new AppointmentApiError(
+      message || `Request failed with status ${response.status}`,
+      response.status
     );
   }
 
@@ -94,13 +119,6 @@ export async function updateAppointmentStatus(
   );
 
   return handleResponse<Appointment>(response);
-}
-export interface AppointmentPage {
-  appointments: Appointment[];
-  page: number;
-  size: number;
-  totalAppointments: number;
-  totalPages: number;
 }
 
 export async function filterAppointmentsPage(
