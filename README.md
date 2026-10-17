@@ -167,3 +167,34 @@ CareBridge is intended as a learning and portfolio project. It does not provide 
 ## Project goals
 
 CareBridge was developed to practice end-to-end software engineering: designing domain models and APIs, persisting relational data, securing backend operations, building usable frontend workflows, and validating behavior with automated tests.
+
+---
+
+## Application Screenshots
+
+The following screenshots demonstrate the CareBridge user interface and its main features. All patient data shown is fictional and used for demonstration purposes.
+
+### Dashboard
+
+Overview of registered patients, healthcare units, appointments, and appointment statuses.
+
+![CareBridge Dashboard](docs/screenshots/dashboard.png)
+
+### Patient Management
+
+Patient registry with search, healthcare unit filtering, pagination, and patient management.
+
+![CareBridge Patient Management](docs/screenshots/patients.png)
+
+### Appointment Management
+
+Appointment booking and management with patient search, filtering, pagination, and status tracking.
+
+![CareBridge Appointments](docs/screenshots/appointments.png)
+
+### Healthcare Units
+
+Healthcare unit directory with search and patient relationships.
+
+![CareBridge Healthcare Units](docs/screenshots/healthcare-units.png)
+
