@@ -8,6 +8,9 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import se.carebridge.appointment.dto.AppointmentRequest;
 import se.carebridge.appointment.dto.AppointmentResponse;
 import se.carebridge.healthcare.HealthcareUnitEntity;
@@ -220,4 +223,35 @@ public class AppointmentService {
         total,
         totalPages);
   }
+
+  public List<String> getBookedTimes(
+      Long healthcareUnitId,
+      LocalDate date) {
+
+    if (HealthcareUnitEntity.findById(healthcareUnitId) == null) {
+      throw new NotFoundException("Healthcare unit not found");
+    }
+
+    LocalDateTime startOfDay = date.atStartOfDay();
+    LocalDateTime startOfNextDay = date.plusDays(1).atStartOfDay();
+
+    List<AppointmentEntity> bookedAppointments = AppointmentEntity.<AppointmentEntity>list(
+        "healthcareUnit.id = ?1 " +
+            "AND appointmentTime >= ?2 " +
+            "AND appointmentTime < ?3 " +
+            "AND status = ?4 " +
+            "ORDER BY appointmentTime",
+        healthcareUnitId,
+        startOfDay,
+        startOfNextDay,
+        AppointmentStatus.SCHEDULED);
+
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+
+    return bookedAppointments.stream()
+        .map(appointment -> appointment.appointmentTime.format(formatter))
+        .distinct()
+        .toList();
+  }
+
 }

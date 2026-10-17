@@ -12,6 +12,7 @@ import se.carebridge.appointment.dto.AppointmentRequest;
 import se.carebridge.appointment.dto.AppointmentResponse;
 import se.carebridge.appointment.dto.AppointmentPageResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Path("/api/appointments")
@@ -45,6 +46,23 @@ public class AppointmentResource {
         status,
         page,
         size);
+  }
+
+  // Get booked times for a healthcare unit on a given date
+  @GET
+  @Path("/booked-times")
+  public List<String> getBookedTimes(
+      @QueryParam("healthcareUnitId") Long healthcareUnitId,
+      @QueryParam("date") LocalDate date) {
+
+    if (healthcareUnitId == null || date == null) {
+      throw new BadRequestException(
+          "healthcareUnitId and date are required");
+    }
+
+    return appointmentService.getBookedTimes(
+        healthcareUnitId,
+        date);
   }
 
   // Get appointment by ID

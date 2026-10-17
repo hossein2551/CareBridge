@@ -4,6 +4,7 @@ import { keycloak } from "../auth/keycloak";
 import {
   createAppointment,
   filterAppointmentsPage,
+  getBookedTimes,
   updateAppointmentStatus,
   type Appointment,
   type AppointmentStatus,
@@ -45,9 +46,7 @@ const showBookingForm = ref(false);
 
 // Permissions
 const canBook = computed(() =>
-  ["ADMIN", "DOCTOR"].some((role) =>
-    keycloak.hasRealmRole(role)
-  )
+  ["ADMIN", "DOCTOR"].some((role) => keycloak.hasRealmRole(role))
 );
 
 // Booking form
@@ -56,13 +55,64 @@ const bookingForm = ref({
   healthcareUnitId: null as number | null,
   appointmentTime: "",
 });
+// Clear previous booking errors when the form changes
+watch(
+  bookingForm,
+  () => {
+    bookingError.value = "";
+  },
+  { deep: true }
+);
+// Booked times
+const bookedTimes = ref<string[]>([]);
+const loadingBookedTimes = ref(false);
+const bookedTimesError = ref("");
+let bookedTimesRequestId = 0;
 
-// Get patient name
+const selectedBookingDate = computed(() =>
+  bookingForm.value.appointmentTime.slice(0, 10)
+);
+const selectedBookingTime = computed(() =>
+  bookingForm.value.appointmentTime.slice(11, 16)
+);
+
+const isSelectedTimeBooked = computed(() =>
+  !loadingBookedTimes.value &&
+  !bookedTimesError.value &&
+  bookedTimes.value.includes(selectedBookingTime.value)
+);
+
+watch(
+  [() => bookingForm.value.healthcareUnitId, selectedBookingDate],
+  async ([unitId, date]) => {
+    const requestId = ++bookedTimesRequestId;
+    bookedTimes.value = [];
+    bookedTimesError.value = "";
+
+    if (unitId === null || !date) {
+      loadingBookedTimes.value = false;
+      return;
+    }
+
+    loadingBookedTimes.value = true;
+    try {
+      const times = await getBookedTimes(unitId, date);
+      if (requestId !== bookedTimesRequestId) return;
+      bookedTimes.value = times;
+    } catch (err) {
+      if (requestId !== bookedTimesRequestId) return;
+      bookedTimesError.value =
+        err instanceof Error ? err.message : "Could not load booked times.";
+    } finally {
+      if (requestId === bookedTimesRequestId) {
+        loadingBookedTimes.value = false;
+      }
+    }
+  }
+);
+
 function getPatientName(patientId: number): string {
-  const patient = patients.value.find(
-    (item) => item.id === patientId
-  );
-
+  const patient = patients.value.find((item) => item.id === patientId);
   return patient
     ? `${patient.firstName} ${patient.lastName}`
     : `Patient ${patientId}`;
@@ -411,6 +461,42 @@ onMounted(() => {
           </div>
         </div>
 
+<div
+  v-if="bookingForm.healthcareUnitId !== null && selectedBookingDate"
+  class="booked-times-panel"
+>
+  <h3>Booked times for {{ selectedBookingDate }}</h3>
+
+  <p v-if="loadingBookedTimes">
+    Loading booked times...
+  </p>
+
+  <p v-else-if="bookedTimesError" class="error">
+    {{ bookedTimesError }}
+  </p>
+
+  <p v-else-if="bookedTimes.length === 0">
+    No booked times found for this date.
+  </p>
+
+  <div v-else class="booked-times-list">
+    <span
+      v-for="time in bookedTimes"
+      :key="time"
+      class="booked-time"
+    >
+      {{ time }}
+    </span>
+  </div>
+</div>
+<p
+  v-if="isSelectedTimeBooked"
+  class="error"
+  role="alert"
+>
+  This time is already booked. Please select another time.
+</p>
+
         <p
           v-if="bookingError"
           class="error"
@@ -432,7 +518,7 @@ onMounted(() => {
           <button
             type="submit"
             class="save-btn"
-            :disabled="booking"
+            :disabled="booking || isSelectedTimeBooked || loadingBookedTimes || !!bookedTimesError"
           >
             {{
               booking
@@ -859,4 +945,34 @@ th {
 @media (max-width: 800px) {
   .filters-grid { grid-template-columns: 1fr; }
 }
+
+.booked-times-panel {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.booked-times-panel h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #334155;
+}
+
+.booked-times-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.booked-time {
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 </style>

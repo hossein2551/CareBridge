@@ -152,3 +152,23 @@ export async function filterAppointmentsPage(
 
   return handleResponse<AppointmentPage>(response);
 }
+
+export async function getBookedTimes(
+  healthcareUnitId: number,
+  date: string
+): Promise<string[]> {
+  const params = new URLSearchParams({
+    healthcareUnitId: String(healthcareUnitId),
+    date,
+  });
+
+  const response = await fetch(
+    `${API_URL}/api/appointments/booked-times?${params.toString()}`,
+    {
+      method: "GET",
+      headers: await getAuthHeaders(),
+    }
+  );
+
+  return handleResponse<string[]>(response);
+}
