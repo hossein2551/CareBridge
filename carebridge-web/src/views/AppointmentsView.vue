@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { keycloak } from "../auth/keycloak";
 import {
   createAppointment,
@@ -43,7 +44,33 @@ const error = ref("");
 const booking = ref(false);
 const bookingError = ref("");
 const showBookingForm = ref(false);
+const route = useRoute();
 
+function openBookingFromCalendar(): void {
+  const date = route.query.date;
+
+  if (typeof date !== "string") return;
+
+  // Accept valid calendar dates only
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+
+  const parsedDate = new Date(`${date}T00:00:00`);
+
+  if (
+    Number.isNaN(parsedDate.getTime()) ||
+    parsedDate.getFullYear() !== Number(date.slice(0, 4)) ||
+    parsedDate.getMonth() + 1 !== Number(date.slice(5, 7)) ||
+    parsedDate.getDate() !== Number(date.slice(8, 10))
+  ) {
+    return;
+  }
+
+  if (!canBook.value) return;
+
+  openBookingForm();
+
+  bookingForm.value.appointmentTime = `${date}T09:00`;
+}
 // Permissions
 const canBook = computed(() =>
   ["ADMIN", "DOCTOR"].some((role) => keycloak.hasRealmRole(role))
@@ -344,7 +371,17 @@ async function changeAppointmentStatus(
 onMounted(() => {
   void loadReferenceData();
   void loadAppointments(0);
+  openBookingFromCalendar();
 });
+// Update booking form when calendar date changes
+watch(
+  () => route.query.date,
+  (newDate, oldDate) => {
+    if (newDate !== oldDate) {
+      openBookingFromCalendar();
+    }
+  }
+);
 </script>
 
 <template>
