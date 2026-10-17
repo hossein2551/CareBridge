@@ -22,6 +22,11 @@ const router = createRouter({
       component: () => import("../views/AppointmentsView.vue"),
     },
     {
+      path: "/calendar",
+      name: "calendar",
+      component: () => import("../views/CalendarView.vue"),
+    },
+    {
       path: "/healthcare-units",
       name: "healthcare-units",
       component: () => import("../views/HealthcareUnitsView.vue"),

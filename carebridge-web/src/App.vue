@@ -35,14 +35,15 @@ async function logout() {
         <p>Healthcare Platform</p>
       </div>
 
-      <nav>
+    
+<nav>
   <RouterLink to="/">Dashboard</RouterLink>
   <RouterLink to="/patients">Patients</RouterLink>
   <RouterLink to="/appointments">Appointments</RouterLink>
-  <RouterLink to="/healthcare-units">
-    Healthcare Units
-  </RouterLink>
+  <RouterLink to="/calendar">Calendar</RouterLink>
+  <RouterLink to="/healthcare-units">Healthcare Units</RouterLink>
 </nav>
+
 
       <div class="sidebar-footer">
   <p>Signed in as</p>
