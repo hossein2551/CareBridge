@@ -1,0 +1,58 @@
+
+name: CareBridge Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend-tests:
+    name: Build and test Quarkus API
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: carebridge_user
+          POSTGRES_PASSWORD: carebridge_ci_password
+          POSTGRES_DB: carebridge_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U carebridge_user -d carebridge_test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      QUARKUS_DATASOURCE_USERNAME: carebridge_user
+      QUARKUS_DATASOURCE_PASSWORD: carebridge_ci_password
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/carebridge_test_db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: carebridge-api/pom.xml
+
+      - name: Build and run backend tests
+        working-directory: carebridge-api
+        run: mvn --batch-mode test
+
+      - name: Upload test reports if tests fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: carebridge-api/target/surefire-reports/
+          if-no-files-found: ignore
