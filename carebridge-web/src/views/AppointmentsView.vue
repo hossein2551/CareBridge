@@ -392,8 +392,7 @@ onMounted(() => {
                 :key="unit.id"
                 :value="unit.id"
               >
-                {{ unit.name }} – {{ unit.city }}
-              </option>
+{{ unit.name }} - {{ unit.city }}              </option>
             </select>
           </div>
 
@@ -573,8 +572,7 @@ onMounted(() => {
                   Cancel
                 </button>
               </div>
-              <span v-else class="no-actions">—</span>
-            </td>
+<span v-else class="no-actions">-</span>            </td>
           </tr>
         </tbody>
       </table>
