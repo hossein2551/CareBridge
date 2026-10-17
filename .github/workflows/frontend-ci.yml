@@ -1,0 +1,35 @@
+
+name: CareBridge Frontend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  frontend-build:
+    name: Build Vue frontend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: carebridge-web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: carebridge-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check TypeScript and build Vue
+        run: npm run build
