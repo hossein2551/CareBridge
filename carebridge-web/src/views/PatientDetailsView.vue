@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-
+import { keycloak } from "../auth/keycloak";
 import { getPatientById, type Patient } from "../api/patients";
 
 import {
@@ -18,7 +18,22 @@ import {
 
 const route = useRoute();
 const router = useRouter();
+const canBook = computed(() =>
+  ["ADMIN", "DOCTOR"].some((role) =>
+    keycloak.hasRealmRole(role)
+  )
+);
 
+function bookForPatient(): void {
+  if (!canBook.value || !patient.value) return;
+
+  void router.push({
+    path: "/appointments",
+    query: {
+      patientId: String(patient.value.id),
+    },
+  });
+}
 const patient = ref<Patient | null>(null);
 const appointments = ref<Appointment[]>([]);
 const healthcareUnits = ref<HealthcareUnit[]>([]);
@@ -177,7 +192,15 @@ onMounted(() => {
           <p>Patient ID: {{ patient.id }}</p>
         </div>
       </div>
-
+<div v-if="canBook" class="patient-actions">
+  <button
+    type="button"
+    class="book-patient-btn"
+    @click="bookForPatient"
+  >
+    + Book appointment
+  </button>
+</div>
       <div class="info-grid">
         <div class="info-card">
           <span>Birth year</span>
@@ -456,5 +479,16 @@ th {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: white;
+}
+.patient-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.book-patient-btn {
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
 }
 </style>

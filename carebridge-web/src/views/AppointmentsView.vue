@@ -42,8 +42,14 @@ const filteredBookingPatients = computed(() => {
 });
 function selectBookingPatient(patient: Patient): void {
   bookingForm.value.patientId = patient.id;
+
   bookingPatientSearch.value =
     `${patient.firstName} ${patient.lastName}`;
+
+  // Automatically select the patient's healthcare unit
+  if (patient.healthcareUnitId !== null) {
+    bookingForm.value.healthcareUnitId = patient.healthcareUnitId;
+  }
 }
 const healthcareUnits = ref<HealthcareUnit[]>([]);
 
@@ -67,31 +73,62 @@ const bookingError = ref("");
 const showBookingForm = ref(false);
 const route = useRoute();
 
+
 function openBookingFromCalendar(): void {
   const date = route.query.date;
+  const patientIdParam = route.query.patientId;
 
-  if (typeof date !== "string") return;
+  let validDate: string | null = null;
+  let validPatientId: number | null = null;
 
-  // Accept valid calendar dates only
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  // Check the date from Calendar
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const parsedDate = new Date(`${date}T00:00:00`);
 
-  const parsedDate = new Date(`${date}T00:00:00`);
+    if (
+      !Number.isNaN(parsedDate.getTime()) &&
+      parsedDate.getFullYear() === Number(date.slice(0, 4)) &&
+      parsedDate.getMonth() + 1 === Number(date.slice(5, 7)) &&
+      parsedDate.getDate() === Number(date.slice(8, 10))
+    ) {
+      validDate = date;
+    }
+  }
 
-  if (
-    Number.isNaN(parsedDate.getTime()) ||
-    parsedDate.getFullYear() !== Number(date.slice(0, 4)) ||
-    parsedDate.getMonth() + 1 !== Number(date.slice(5, 7)) ||
-    parsedDate.getDate() !== Number(date.slice(8, 10))
-  ) {
+  // Check the patient ID from Patient Details
+  if (typeof patientIdParam === "string") {
+    const id = Number(patientIdParam);
+
+    if (Number.isSafeInteger(id) && id > 0) {
+      validPatientId = id;
+    }
+  }
+
+  if (!canBook.value || (validDate === null && validPatientId === null)) {
     return;
   }
 
-  if (!canBook.value) return;
-
   openBookingForm();
 
-  bookingForm.value.appointmentTime = `${date}T09:00`;
+  // Prefill the selected date
+  if (validDate !== null) {
+    bookingForm.value.appointmentTime = `${validDate}T09:00`;
+  }
+
+  // Prefill the selected patient
+  if (validPatientId !== null) {
+    const selectedPatient = patients.value.find(
+      (patient) => patient.id === validPatientId
+    );
+
+    if (selectedPatient) {
+      selectBookingPatient(selectedPatient);
+    } else {
+      bookingForm.value.patientId = validPatientId;
+    }
+  }
 }
+
 // Permissions
 const canBook = computed(() =>
   ["ADMIN", "DOCTOR"].some((role) => keycloak.hasRealmRole(role))
@@ -233,6 +270,15 @@ async function loadReferenceData(): Promise<void> {
     ]);
     patients.value = patientsData;
     healthcareUnits.value = unitsData;
+    if (bookingForm.value.patientId !== null) {
+  const selectedPatient = patients.value.find(
+    (patient) => patient.id === bookingForm.value.patientId
+  );
+
+  if (selectedPatient) {
+  selectBookingPatient(selectedPatient);
+}
+}
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load patients or healthcare units.";
   }
@@ -403,11 +449,9 @@ onMounted(() => {
 });
 // Update booking form when calendar date changes
 watch(
-  () => route.query.date,
-  (newDate, oldDate) => {
-    if (newDate !== oldDate) {
-      openBookingFromCalendar();
-    }
+  () => [route.query.date, route.query.patientId],
+  () => {
+    openBookingFromCalendar();
   }
 );
 </script>
