@@ -24,6 +24,27 @@ import {
 // Data
 const appointments = ref<Appointment[]>([]);
 const patients = ref<Patient[]>([]);
+const bookingPatientSearch = ref("");
+
+const filteredBookingPatients = computed(() => {
+  const search = bookingPatientSearch.value.trim().toLowerCase();
+
+  return patients.value.filter((patient) => {
+    const fullName =
+      `${patient.firstName} ${patient.lastName}`.toLowerCase();
+
+    return (
+      !search ||
+      fullName.includes(search) ||
+      patient.id === bookingForm.value.patientId
+    );
+  });
+});
+function selectBookingPatient(patient: Patient): void {
+  bookingForm.value.patientId = patient.id;
+  bookingPatientSearch.value =
+    `${patient.firstName} ${patient.lastName}`;
+}
 const healthcareUnits = ref<HealthcareUnit[]>([]);
 
 // Server-side filtering and pagination
@@ -245,7 +266,13 @@ onUnmounted(() => {
 });
 
 // Open booking form
+
+function changeBookingPatient(): void {
+  bookingForm.value.patientId = null;
+  bookingPatientSearch.value = "";
+}
 function openBookingForm(): void {
+  bookingPatientSearch.value = "";
   bookingError.value = "";
 
   bookingForm.value = {
@@ -256,6 +283,7 @@ function openBookingForm(): void {
 
   showBookingForm.value = true;
 }
+
 
 // Close booking form
 function closeBookingForm(): void {
@@ -432,33 +460,59 @@ watch(
 
       <form @submit.prevent="bookAppointment">
         <div class="form-grid">
-          <div class="form-field">
-            <label for="appointment-patient">
-              Patient
-            </label>
+         
+<div class="form-field">
+  <label for="appointment-patient">
+    Patient
+  </label>
 
-            <select
-              id="appointment-patient"
-              v-model="bookingForm.patientId"
-              required
-              :disabled="booking"
-            >
-              <option :value="null" disabled>
-                Select patient
-              </option>
+  <input
+    id="appointment-patient"
+    v-model="bookingPatientSearch"
+    type="search"
+    placeholder="Search patient by name..."
+    autocomplete="off"
+    :disabled="booking"
+  />
 
-              <option
-                v-for="patient in patients"
-                :key="patient.id"
-                :value="patient.id"
-              >
-                {{ patient.firstName }}
-                {{ patient.lastName }}
-                (ID {{ patient.id }})
-              </option>
-            </select>
-          </div>
+  <div
+    v-if="bookingPatientSearch.trim() && bookingForm.patientId === null"
+    class="patient-search-results"
+  >
+    <button
+      v-for="patient in filteredBookingPatients"
+      :key="patient.id"
+      type="button"
+      class="patient-search-result"
+      :disabled="booking"
+      @click="selectBookingPatient(patient)"
+    >
+      {{ patient.firstName }} {{ patient.lastName }}
+      (ID {{ patient.id }})
+    </button>
 
+    <p v-if="filteredBookingPatients.length === 0">
+      No patients found.
+    </p>
+  </div>
+
+  <div
+    v-if="bookingForm.patientId !== null"
+    class="selected-patient"
+  >
+    <span>
+      Selected: {{ getPatientName(bookingForm.patientId) }}
+    </span>
+
+    <button
+      type="button"
+      :disabled="booking"
+      @click="changeBookingPatient"
+    >
+      Change
+    </button>
+  </div>
+</div>
           <div class="form-field">
             <label for="appointment-unit">
               Healthcare unit
