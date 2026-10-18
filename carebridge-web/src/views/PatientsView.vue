@@ -414,8 +414,25 @@ watch(selectedHealthcareUnitId, () => {
         <tbody>
           <tr v-for="patient in patients" :key="patient.id">
             <td>{{ patient.id }}</td>
-            <td>{{ patient.firstName }}</td>
-            <td>{{ patient.lastName }}</td>
+            
+<td>
+  <RouterLink
+    :to="`/patients/${patient.id}`"
+    class="patient-link"
+  >
+    {{ patient.firstName }}
+  </RouterLink>
+</td>
+
+<td>
+  <RouterLink
+    :to="`/patients/${patient.id}`"
+    class="patient-link"
+  >
+    {{ patient.lastName }}
+  </RouterLink>
+</td>
+
             <td>{{ patient.birthYear }}</td>
 <td>{{ getHealthcareUnitName(patient.healthcareUnitId) }}</td>
             <td>
@@ -809,5 +826,20 @@ th {
   .pagination {
     align-items: flex-start;
   }
+}
+.patient-link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.patient-link:hover {
+  text-decoration: underline;
+}
+
+.patient-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 </style>

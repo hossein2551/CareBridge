@@ -252,3 +252,19 @@ export async function filterPatientsPage(
 
   return (await response.json()) as PatientPage;
 }
+
+export async function getPatientById(
+  id: number
+): Promise<Patient> {
+  const response = await fetch(
+    `${API_URL}/api/patients/${id}`,
+    {
+      method: "GET",
+      headers: await getPatientAuthHeaders(),
+    }
+  );
+
+  checkResponse(response);
+
+  return (await response.json()) as Patient;
+}
