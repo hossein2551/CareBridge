@@ -6,11 +6,10 @@ import { keycloak } from "../auth/keycloak";
 import { getPatientById, type Patient } from "../api/patients";
 
 import {
-  getAppointments,
+  getAppointmentsByPatient,
   type Appointment,
   type AppointmentStatus,
 } from "../api/appointments";
-
 import {
   getHealthcareUnits,
   type HealthcareUnit,
@@ -125,11 +124,11 @@ async function loadPatientDetails(): Promise<void> {
 
   try {
     const [patientData, appointmentData, unitsData] =
-      await Promise.all([
-        getPatientById(patientId.value),
-        getAppointments(),
-        getHealthcareUnits(),
-      ]);
+  await Promise.all([
+    getPatientById(patientId.value),
+    getAppointmentsByPatient(patientId.value),
+    getHealthcareUnits(),
+  ]);
 
     patient.value = patientData;
     appointments.value = appointmentData;

@@ -65,6 +65,16 @@ public class AppointmentResource {
         date);
   }
 
+  // Get appointment history for a specific patient
+  @GET
+  @Path("/patient/{patientId}")
+  public List<AppointmentResponse> getAppointmentsByPatient(
+      @PathParam("patientId") Long patientId) {
+
+    return appointmentService.getAppointmentsByPatient(patientId);
+  }
+
+
   // Get appointment by ID
   @GET
   @Path("/{id}")

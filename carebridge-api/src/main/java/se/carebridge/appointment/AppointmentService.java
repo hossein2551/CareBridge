@@ -74,6 +74,28 @@ public class AppointmentService {
         .toList();
   }
 
+  public List<AppointmentResponse> getAppointmentsByPatient(Long patientId) {
+
+    if (patientId == null || patientId <= 0) {
+      throw new jakarta.ws.rs.BadRequestException(
+          "A valid patient ID is required");
+    }
+
+    PatientEntity patient = PatientEntity.findById(patientId);
+
+    if (patient == null) {
+      throw new NotFoundException("Patient not found");
+    }
+
+    return AppointmentEntity.<AppointmentEntity>find(
+        "patient.id = ?1 ORDER BY appointmentTime DESC",
+        patientId)
+        .list()
+        .stream()
+        .map(this::toResponse)
+        .toList();
+  }
+
   public AppointmentResponse getAppointmentById(Long id) {
     AppointmentEntity appointment = AppointmentEntity.findById(id);
 

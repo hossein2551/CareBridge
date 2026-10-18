@@ -83,6 +83,19 @@ export async function getAppointments(): Promise<Appointment[]> {
   return handleResponse<Appointment[]>(response);
 }
 
+export async function getAppointmentsByPatient(
+  patientId: number
+): Promise<Appointment[]> {
+  const response = await fetch(
+    `${API_URL}/api/appointments/patient/${patientId}`,
+    {
+      headers: await getAuthHeaders(),
+    }
+  );
+
+  return handleResponse<Appointment[]>(response);
+}
+
 export async function getAppointmentById(
   id: number
 ): Promise<Appointment> {
