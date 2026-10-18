@@ -40,17 +40,19 @@ const filteredBookingPatients = computed(() => {
     );
   });
 });
+
 function selectBookingPatient(patient: Patient): void {
   bookingForm.value.patientId = patient.id;
 
   bookingPatientSearch.value =
     `${patient.firstName} ${patient.lastName}`;
 
-  // Automatically select the patient's healthcare unit
-  if (patient.healthcareUnitId !== null) {
-    bookingForm.value.healthcareUnitId = patient.healthcareUnitId;
-  }
+  // Use the patient's registered healthcare unit.
+  // Clear the previous unit if the patient has none.
+  bookingForm.value.healthcareUnitId =
+    patient.healthcareUnitId ?? null;
 }
+
 const healthcareUnits = ref<HealthcareUnit[]>([]);
 
 // Server-side filtering and pagination
