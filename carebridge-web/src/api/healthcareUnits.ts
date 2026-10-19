@@ -38,7 +38,9 @@ export async function getHealthcareUnits(): Promise<HealthcareUnit[]> {
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to load healthcare units: ${response.status}`);
+    throw new Error(
+      `Failed to load healthcare units: ${response.status}`
+    );
   }
 
   return (await response.json()) as HealthcareUnit[];

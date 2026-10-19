@@ -13,7 +13,8 @@ CareBridge is a portfolio project exploring how a healthcare administration plat
 - **Appointments:** Schedule visits, view bookings, and change scheduled appointments to `COMPLETED` or `CANCELLED`.
 - **Appointment search:** Filter by patient name, healthcare unit, and status, with server-side pagination.
 - **Dashboard:** View counts for patients, healthcare units, and appointments by status.
-- **Security:** Sign in with Keycloak; the backend enforces role-based permissions for `ADMIN`, `DOCTOR`, and `NURSE`.
+
+- **Security:** Authentication with Keycloak and role-based permissions for ADMIN, DOCTOR, and NURSE. Healthcare staff can only access patients and appointments belonging to their assigned healthcare units.
 - **Testing:** Automated backend tests cover patient and appointment workflows, filtering, pagination, validation, and authorization.
 
 ## Tech stack
@@ -66,6 +67,44 @@ The frontend obtains access tokens through Keycloak. The Quarkus backend validat
 | Complete or cancel appointments | Yes | Yes | No |
 
 These are the permissions implemented in the patient and appointment APIs; this table is not a claim of production-grade security or compliance.
+
+## Healthcare unit access control
+
+CareBridge includes healthcare unit-based access control to prevent staff from accessing patient information outside their assigned units.
+
+Each staff member can be assigned to one or more healthcare units in PostgreSQL. The backend uses the user's Keycloak identity to check these assignments.
+
+### How it works
+
+- ADMIN can access patients and appointments across all healthcare units.
+- DOCTOR can view and manage patients and appointments within assigned healthcare units, according to their role permissions.
+- NURSE can view patients and appointments within assigned healthcare units.
+- Staff cannot access patients without an assigned healthcare unit.
+- Unauthorized access returns HTTP 403 Forbidden.
+- Patient and appointment searches are filtered in the database, including paginated results.
+
+### Technical implementation
+
+- Keycloak provides authentication and JWT access tokens.
+- Quarkus validates authentication and enforces role-based authorization.
+- PostgreSQL stores staff-to-healthcare-unit assignments.
+- Flyway manages the database schema, including the staff assignment table.
+- Backend services check permissions before accessing or modifying protected resources.
+
+### Testing and troubleshooting
+
+During development, I worked with:
+
+- PostgreSQL queries to verify user assignments and patient relationships.
+- HTTP status codes such as 200, 401, 403, 404, and 409.
+- Quarkus application logs and error messages.
+- JUnit and REST Assured tests.
+- Keycloak authentication and JWT-based authorization.
+- API testing to verify that staff cannot access another healthcare unit's data.
+
+I also tested the authorization rules with a real Keycloak development account and confirmed that allowed requests succeed while unauthorized requests are rejected.
+
+This is a demonstration of application security concepts, not a production-certified healthcare security solution.
 
 ## Getting started (local development)
 

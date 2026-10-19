@@ -15,7 +15,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @QuarkusTest
-@TestSecurity(user = "test-doctor", roles = {"DOCTOR"})
+@TestSecurity(user = "test-admin", roles = {"ADMIN"})
 public class PatientSearchPaginationTest {
 
     @Inject

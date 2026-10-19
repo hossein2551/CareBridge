@@ -19,7 +19,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 @QuarkusTest
-@TestSecurity(user = "test-doctor", roles = { "DOCTOR" })
+@TestSecurity(user = "test-admin", roles = { "ADMIN" })
 public class AppointmentPatientHistoryTest {
 
   @Inject
@@ -172,4 +172,25 @@ public class AppointmentPatientHistoryTest {
         .then()
         .statusCode(404);
   }
+  
+  @Test
+  @TestSecurity(user = "unauthorized-user", roles = {"GUEST"})
+  void guestShouldNotAccessPatientHistory() {
+    given()
+        .when()
+        .get("/api/appointments/patient/1")
+        .then()
+        .statusCode(403);
+  }
+
+ @Test
+@TestSecurity(user = "", roles = {})
+void anonymousUserShouldNotAccessPatientHistory() {
+    given()
+        .when()
+        .get("/api/appointments/patient/1")
+        .then()
+        .statusCode(401);
+}
+
 }

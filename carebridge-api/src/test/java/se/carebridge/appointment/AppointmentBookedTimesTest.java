@@ -19,7 +19,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 @QuarkusTest
-@TestSecurity(user = "test-doctor", roles = { "DOCTOR" })
+@TestSecurity(user = "test-admin", roles = { "ADMIN" })
 public class AppointmentBookedTimesTest {
 
   @Inject

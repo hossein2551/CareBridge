@@ -24,3 +24,6 @@ application-secret.properties
 Thumbs.db
 
 *.before-*
+# Allow safe environment variable templates
+!.env.example
+!**/.env.example
